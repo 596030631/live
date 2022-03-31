@@ -489,9 +489,9 @@ RTSPClient::RTSPClient(UsageEnvironment &env, char const *rtspURL,
 
 RTSPClient::~RTSPClient() {
     reset();
-
     delete[] fResponseBuffer;
     delete[] fUserAgentHeaderStr;
+    __android_log_print(ANDROID_LOG_DEBUG, "TAG","~RTSPClient");
 }
 
 void RTSPClient::reset() {
@@ -537,11 +537,12 @@ unsigned RTSPClient::sendRequest(RequestRecord *request) {
 
             if (connectResult < 0) break; // an error occurred
             else if (connectResult == 0) {
-                // A connection is pending, waiting
+                // A connection is pending
                 connectionIsPending = True;
             } // else the connection succeeded.  Continue sending the command.
         }
         if (connectionIsPending) {
+            __android_log_print(ANDROID_LOG_DEBUG, "TAG", "rtsp connectionIsPending");
             fRequestsAwaitingConnection.enqueue(request);
             return request->cseq();
         }
@@ -1031,7 +1032,7 @@ int RTSPClient::openConnection() {
                 envir() << "...local connection opened\n";
             }
         }
-        __android_log_print(ANDROID_LOG_DEBUG, "TAG", "connect result:%d", connectResult);
+        __android_log_print(ANDROID_LOG_DEBUG, "TAG", "rtsp connect result:%d", connectResult);
 
         return connectResult;
     } while (0);

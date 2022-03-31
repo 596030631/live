@@ -35,6 +35,7 @@ file(GLOB_RECURSE live-src
         live/UsageEnvironment/*.cpp
         live/liveMedia/*.c
         live/liveMedia/*.cpp
+        live/testProgs/testRTSPClient.h
         live/testProgs/testRTSPClient.cpp
         native-lib.cpp
         )

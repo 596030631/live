@@ -25,6 +25,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "FileSink.hh"
 #include "GroupsockHelper.hh"
 #include "OutputFile.hh"
+#include "android/log.h"
 
 ////////// FileSink //////////
 
@@ -145,6 +146,8 @@ void FileSink::afterGettingFrame(unsigned frameSize,
   if (fPerFrameFileNameBuffer != NULL) {
     if (fOutFid != NULL) { fclose(fOutFid); fOutFid = NULL; }
   }
+
+  __android_log_print(ANDROID_LOG_DEBUG, "TAG", "FRAME:0x%02x", fBuffer[0]);
 
   // Then try getting the next frame:
   continuePlaying();

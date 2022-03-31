@@ -35,7 +35,6 @@ public:
 				      unsigned bufferSize = 100000,
 				      Boolean oneFilePerFrame = False);
       // See "FileSink.hh" for a description of these parameters.
-
 protected:
   H264VideoFileSink(UsageEnvironment& env, FILE* fid,
 		    char const* sPropParameterSetsStr,
