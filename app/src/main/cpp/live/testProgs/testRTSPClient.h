@@ -27,14 +27,34 @@ public:
 };
 
 class ourRTSPClient : public RTSPClient {
+private:
+
+    static void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode, char *resultString);
+
+    static void continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *resultString);
+
+    static void continueAfterPLAY(RTSPClient *rtspClient, int resultCode, char *resultString);
+
+    static void subsessionAfterPlaying(
+            void *clientData);
+
+    static void subsessionByeHandler(void *clientData, char const *reason);
+
+    static void streamTimerHandler(void *clientData);
+
+    static void setupNextSubsession(RTSPClient *rtspClient);
+
 public:
-    static ourRTSPClient *createNew(UsageEnvironment &env, char const *rtspURL,
+    static ourRTSPClient *createNew(UsageEnvironment &env, const char *rtspURL,
+                                    char const *outFilePath,
                                     int verbosityLevel = 0,
                                     char const *applicationName = NULL,
                                     portNumBits tunnelOverHTTPPortNum = 0);
 
+    char outPath[512];
 protected:
     ourRTSPClient(UsageEnvironment &env, char const *rtspURL,
+                  char const *outFilePath,
                   int verbosityLevel, char const *applicationName,
                   portNumBits tunnelOverHTTPPortNum);
 
@@ -43,11 +63,10 @@ protected:
 
 public:
     StreamClientState scs;
+    void openURL(UsageEnvironment &env, ourRTSPClient *rtspClient);
+    static void shutdownStream(RTSPClient *rtspClient, int exitCode = 0);
 };
 
-
-void openURL(UsageEnvironment &env, ourRTSPClient *rtspClient);
-void shutdownStream(RTSPClient *rtspClient, int exitCode);
 
 
 #endif //LIVE_TESTRTSPCLIENT_H

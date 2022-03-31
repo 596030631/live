@@ -22,33 +22,6 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #include "testRTSPClient.h"
 
-// Forward function definitions:
-
-// RTSP 'response handlers':
-void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode, char *resultString);
-
-void continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *resultString);
-
-void continueAfterPLAY(RTSPClient *rtspClient, int resultCode, char *resultString);
-
-// Other event handler functions:
-void subsessionAfterPlaying(
-        void *clientData); // called when a stream's subsession (e.g., audio or video substream) ends
-void subsessionByeHandler(void *clientData, char const *reason);
-
-// called when a RTCP "BYE" is received for a subsession
-void streamTimerHandler(void *clientData);
-// called at the end of a stream's expected duration (if the stream has not already signaled its end using a RTCP "BYE")
-
-// The main streaming routine (for each "rtsp://" URL):
-void openURL(UsageEnvironment &env, char const *progName, char const *rtspURL);
-
-// Used to iterate through each stream's 'subsessions', setting up each one:
-void setupNextSubsession(RTSPClient *rtspClient);
-
-// Used to shut down and close a stream (including its "RTSPClient" object):
-void shutdownStream(RTSPClient *rtspClient, int exitCode = 1);
-
 // A function that outputs a string that identifies each stream (for debugging output).  Modify this if you wish:
 UsageEnvironment &operator<<(UsageEnvironment &env, const RTSPClient &rtspClient) {
     return env << "[URL:\"" << rtspClient.url() << "\"]: ";
@@ -64,76 +37,9 @@ void usage(UsageEnvironment &env, char const *progName) {
     env << "\t(where each <rtsp-url-i> is a \"rtsp://\" URL)\n";
 }
 
-// Define a class to hold per-stream state that we maintain throughout each stream's lifetime:
-
-
-// If you're streaming just a single stream (i.e., just from a single URL, once), then you can define and use just a single
-// "StreamClientState" structure, as a global variable in your application.  However, because - in this demo application - we're
-// showing how to play multiple streams, concurrently, we can't do that.  Instead, we have to have a separate "StreamClientState"
-// structure for each "RTSPClient".  To do this, we subclass "RTSPClient", and add a "StreamClientState" field to the subclass:
-
-class MyH264VideoFileSink : public H264VideoFileSink {
-
-public:
-    static MyH264VideoFileSink *createNew(UsageEnvironment &env, char const *fileName,
-                                          char const *sPropParameterSetsStr = NULL,
-            // "sPropParameterSetsStr" is an optional 'SDP format' string
-            // (comma-separated Base64-encoded) representing SPS and/or PPS NAL-units
-            // to prepend to the output
-                                          unsigned bufferSize = 100000,
-                                          Boolean oneFilePerFrame = False);
-    // See "FileSink.hh" for a description of these parameters.
-protected:
-    MyH264VideoFileSink(UsageEnvironment &env, FILE *fid,
-                        char const *sPropParameterSetsStr,
-                        unsigned bufferSize, char const *perFrameFileNamePrefix);
-
-    // called only by createNew()
-    virtual ~MyH264VideoFileSink();
-
-private:
-    virtual Boolean continuePlaying();
-};
-
-// Define a data sink (a subclass of "MediaSink") to receive the data for each subsession (i.e., each audio or video 'substream').
-// In practice, this might be a class (or a chain of classes) that decodes and then renders the incoming audio or video.
-// Or it might be a "FileSink", for outputting the received data into a file (as is done by the "openRTSP" application).
-// In this example code, however, we define a simple 'dummy' sink that receives incoming data, but does nothing with it.
-//
-//class DummySink : public MediaSink {
-//public:
-//    static DummySink *createNew(UsageEnvironment &env,
-//                                MediaSubsession &subsession, // identifies the kind of data that's being received
-//                                char const *streamId = NULL); // identifies the stream itself (optional)
-//
-//private:
-//    DummySink(UsageEnvironment &env, MediaSubsession &subsession, char const *streamId);
-//
-//    // called only by "createNew()"
-//    virtual ~DummySink();
-//
-//    static void afterGettingFrame(void *clientData, unsigned frameSize,
-//                                  unsigned numTruncatedBytes,
-//                                  struct timeval presentationTime,
-//                                  unsigned durationInMicroseconds);
-//
-//    void afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes,
-//                           struct timeval presentationTime, unsigned durationInMicroseconds);
-//
-//private:
-//    // redefined virtual functions:
-//    virtual Boolean continuePlaying();
-//
-//private:
-//    u_int8_t *fReceiveBuffer;
-//    MediaSubsession &fSubsession;
-//    char *fStreamId;
-//};
-
-
 static unsigned rtspClientCount = 0; // Counts how many streams (i.e., "RTSPClient"s) are currently in use.
 
-void openURL(UsageEnvironment &env, ourRTSPClient *rtspClient) {
+void ourRTSPClient::openURL(UsageEnvironment &env, ourRTSPClient *rtspClient) {
     // Begin by creating a "RTSPClient" object.  Note that there is a separate "RTSPClient" object for each stream that we wish
     // to receive (even if more than stream uses the same "rtsp://" URL).
     if (rtspClient == NULL) {
@@ -153,7 +59,7 @@ void openURL(UsageEnvironment &env, ourRTSPClient *rtspClient) {
 
 // Implementation of the RTSP 'response handlers':
 
-void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode, char *resultString) {
+void ourRTSPClient::continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode, char *resultString) {
     do {
         UsageEnvironment &env = rtspClient->envir(); // alias
         StreamClientState &scs = ((ourRTSPClient *) rtspClient)->scs; // alias
@@ -195,7 +101,7 @@ void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode, char *resultS
 // If, instead, you want to request that the server stream via RTP-over-TCP, change the following to True:
 #define REQUEST_STREAMING_OVER_TCP False
 
-void setupNextSubsession(RTSPClient *rtspClient) {
+void ourRTSPClient::setupNextSubsession(RTSPClient *rtspClient) {
     UsageEnvironment &env = rtspClient->envir(); // alias
     StreamClientState &scs = ((ourRTSPClient *) rtspClient)->scs; // alias
 
@@ -232,7 +138,7 @@ void setupNextSubsession(RTSPClient *rtspClient) {
     }
 }
 
-void continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *resultString) {
+void ourRTSPClient::continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *resultString) {
     do {
         UsageEnvironment &env = rtspClient->envir(); // alias
         StreamClientState &scs = ((ourRTSPClient *) rtspClient)->scs; // alias
@@ -255,18 +161,17 @@ void continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *resultStri
         // Having successfully setup the subsession, create a data sink for it, and call "startPlaying()" on it.
         // (This will prepare the data sink to receive data; the actual flow of data from the client won't start happening until later,
         // after we've sent a RTSP "PLAY" command.)
-
-        __android_log_print(ANDROID_LOG_DEBUG, "TAG", "continueAfterSETUP");
-
-        const char *outPath = "/storage/emulated/0/Android/data/com.shuaijun.live/files/Movies/test.h264";
-        scs.subsession->sink = H264VideoFileSink::createNew(env, outPath, NULL, 102400,
+        ourRTSPClient *myRtspClient = dynamic_cast<ourRTSPClient *>(rtspClient);
+        __android_log_print(ANDROID_LOG_DEBUG, "TAG", "continueAfterSETUP:%s",
+                            myRtspClient->outPath);
+        scs.subsession->sink = H264VideoFileSink::createNew(env, myRtspClient->outPath, NULL,
+                                                            102400,
                                                             false);
         if (scs.subsession->sink == NULL) {
             env << *rtspClient << "Failed to create a data sink for the \"" << *scs.subsession
                 << "\" subsession: " << env.getResultMsg() << "\n";
             break;
         }
-
         env << *rtspClient << "Created a data sink for the \"" << *scs.subsession
             << "\" subsession\n";
         scs.subsession->miscPtr = rtspClient; // a hack to let subsession handler functions get the "RTSPClient" from the subsession
@@ -284,7 +189,7 @@ void continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *resultStri
     setupNextSubsession(rtspClient);
 }
 
-void continueAfterPLAY(RTSPClient *rtspClient, int resultCode, char *resultString) {
+void ourRTSPClient::continueAfterPLAY(RTSPClient *rtspClient, int resultCode, char *resultString) {
     Boolean success = False;
 
     do {
@@ -330,7 +235,7 @@ void continueAfterPLAY(RTSPClient *rtspClient, int resultCode, char *resultStrin
 
 // Implementation of the other event handlers:
 
-void subsessionAfterPlaying(void *clientData) {
+void ourRTSPClient::subsessionAfterPlaying(void *clientData) {
     MediaSubsession *subsession = (MediaSubsession *) clientData;
     RTSPClient *rtspClient = (RTSPClient *) (subsession->miscPtr);
 
@@ -349,7 +254,7 @@ void subsessionAfterPlaying(void *clientData) {
     shutdownStream(rtspClient);
 }
 
-void subsessionByeHandler(void *clientData, char const *reason) {
+void ourRTSPClient::subsessionByeHandler(void *clientData, char const *reason) {
     MediaSubsession *subsession = (MediaSubsession *) clientData;
     RTSPClient *rtspClient = (RTSPClient *) subsession->miscPtr;
     UsageEnvironment &env = rtspClient->envir(); // alias
@@ -365,7 +270,7 @@ void subsessionByeHandler(void *clientData, char const *reason) {
     subsessionAfterPlaying(subsession);
 }
 
-void streamTimerHandler(void *clientData) {
+void ourRTSPClient::streamTimerHandler(void *clientData) {
     ourRTSPClient *rtspClient = (ourRTSPClient *) clientData;
     StreamClientState &scs = rtspClient->scs; // alias
 
@@ -375,7 +280,7 @@ void streamTimerHandler(void *clientData) {
     shutdownStream(rtspClient);
 }
 
-void shutdownStream(RTSPClient *rtspClient, int exitCode) {
+void ourRTSPClient::shutdownStream(RTSPClient *rtspClient, int exitCode) {
     UsageEnvironment &env = rtspClient->envir(); // alias
     StreamClientState &scs = ((ourRTSPClient *) rtspClient)->scs; // alias
 
@@ -394,7 +299,6 @@ void shutdownStream(RTSPClient *rtspClient, int exitCode) {
                     subsession->rtcpInstance()->setByeHandler(NULL,
                                                               NULL); // in case the server sends a RTCP "BYE" while handling "TEARDOWN"
                 }
-
                 someSubsessionsWereActive = True;
             }
         }
@@ -418,22 +322,27 @@ void shutdownStream(RTSPClient *rtspClient, int exitCode) {
     }
 }
 
-
 // Implementation of "ourRTSPClient":
 
-ourRTSPClient *ourRTSPClient::createNew(UsageEnvironment &env, char const *rtspURL,
-                                        int verbosityLevel, char const *applicationName,
-                                        portNumBits tunnelOverHTTPPortNum) {
-    return new ourRTSPClient(env, rtspURL, verbosityLevel, applicationName, tunnelOverHTTPPortNum);
+ourRTSPClient *
+ourRTSPClient::createNew(UsageEnvironment &env, char const *rtspURL, const char *c_outPath,
+                         int verbosityLevel, char const *applicationName,
+                         portNumBits tunnelOverHTTPPortNum) {
+    return new ourRTSPClient(env, rtspURL, c_outPath, verbosityLevel, applicationName,
+                             tunnelOverHTTPPortNum);
 }
 
-ourRTSPClient::ourRTSPClient(UsageEnvironment &env, char const *rtspURL,
+ourRTSPClient::ourRTSPClient(UsageEnvironment &env, char const *rtspURL, const char *c_outPath,
                              int verbosityLevel, char const *applicationName,
                              portNumBits tunnelOverHTTPPortNum)
         : RTSPClient(env, rtspURL, verbosityLevel, applicationName, tunnelOverHTTPPortNum, -1) {
+
+    strcpy(outPath, c_outPath);
+    __android_log_print(ANDROID_LOG_DEBUG, "TAG", "File out path:%s", outPath);
 }
 
 ourRTSPClient::~ourRTSPClient() {
+    __android_log_print(ANDROID_LOG_DEBUG, "TAG", "~ourRTSPClient");
 }
 
 
@@ -448,82 +357,7 @@ StreamClientState::~StreamClientState() {
     if (session != NULL) {
         // We also need to delete "session", and unschedule "streamTimerTask" (if set)
         UsageEnvironment &env = session->envir(); // alias
-
         env.taskScheduler().unscheduleDelayedTask(streamTimerTask);
         Medium::close(session);
     }
 }
-
-// Implementation of "DummySink":
-
-// Even though we're not going to be doing anything with the incoming data, we still need to receive it.
-// Define the size of the buffer that we'll use:
-#define DUMMY_SINK_RECEIVE_BUFFER_SIZE 100000
-//
-//DummySink *
-//DummySink::createNew(UsageEnvironment &env, MediaSubsession &subsession, char const *streamId) {
-//    return new DummySink(env, subsession, streamId);
-//}
-//
-//DummySink::DummySink(UsageEnvironment &env, MediaSubsession &subsession, char const *streamId)
-//        : MediaSink(env),
-//          fSubsession(subsession) {
-//    fStreamId = strDup(streamId);
-//    fReceiveBuffer = new u_int8_t[DUMMY_SINK_RECEIVE_BUFFER_SIZE];
-//}
-//
-//DummySink::~DummySink() {
-//    delete[] fReceiveBuffer;
-//    delete[] fStreamId;
-//}
-//
-//void H264or5VideoFileSink::afterGettingFrame(void *clientData, unsigned frameSize, unsigned numTruncatedBytes,
-//                                  struct timeval presentationTime,
-//                                  unsigned durationInMicroseconds) {
-//    DummySink *sink = (DummySink *) clientData;
-//    sink->afterGettingFrame(frameSize, numTruncatedBytes, presentationTime, durationInMicroseconds);
-//}
-
-//// If you don't want to see debugging output for each received frame, then comment out the following line:
-
-//#define DEBUG_PRINT_EACH_RECEIVED_FRAME 1
-//
-//void H264or5VideoFileSink::afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes,
-//                                  struct timeval presentationTime) {
-//    // We've just received a frame of data.  (Optionally) print out information about it:
-//#ifdef DEBUG_PRINT_EACH_RECEIVED_FRAME
-//    if (fStreamId != NULL) envir() << "Stream \"" << fStreamId << "\"; ";
-//    envir() << fSubsession.mediumName() << "/" << fSubsession.codecName() << ":\tReceived "
-//            << frameSize << " bytes";
-//    if (numTruncatedBytes > 0) envir() << " (with " << numTruncatedBytes << " bytes truncated)";
-//    char uSecsStr[6 + 1]; // used to output the 'microseconds' part of the presentation time
-//    sprintf(uSecsStr, "%06u", (unsigned) presentationTime.tv_usec);
-//    __android_log_print(ANDROID_LOG_DEBUG, "TAG", "frame size %03d  presentTime %06u",
-//                        frameSize, (unsigned) presentationTime.tv_usec);
-//
-//    envir() << ".\tPresentation time: " << (int) presentationTime.tv_sec << "." << uSecsStr;
-//    if (fSubsession.rtpSource() != NULL &&
-//        !fSubsession.rtpSource()->hasBeenSynchronizedUsingRTCP()) {
-//        envir()
-//                << "!"; // mark the debugging output to indicate that this presentation time is not RTCP-synchronized
-//    }
-//#ifdef DEBUG_PRINT_NPT
-//    envir() << "\tNPT: " << fSubsession.getNormalPlayTime(presentationTime);
-//#endif
-//    envir() << "\n";
-//#endif
-//
-//    // Then continue, to request the next frame of data:
-//    continuePlaying();
-//}
-
-//
-//Boolean DummySink::continuePlaying() {
-//    if (fSource == NULL) return False; // sanity check (should not happen)
-//
-//    // Request the next frame of data from our input source.  "afterGettingFrame()" will get called later, when it arrives:
-//    fSource->getNextFrame(fReceiveBuffer, DUMMY_SINK_RECEIVE_BUFFER_SIZE,
-//                          afterGettingFrame, this,
-//                          onSourceClosure, this);
-//    return True;
-//}
